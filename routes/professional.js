@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const Professional = require('../models/Professional');
+const AcceptedProfessional = require('../models/AcceptedProfessional');
 
 // GET all professionals
-// Get all professionals
 router.get('/professionals', async (req, res) => {
   try {
     const professionals = await Professional.find();
@@ -13,30 +13,7 @@ router.get('/professionals', async (req, res) => {
   }
 });
 
-// Accept a professional by ID
-router.patch('/professionals/accept/:id', async (req, res) => {
-  try {
-    const professional = await Professional.findById(req.params.id);
-    if (!professional) {
-      return res.status(404).json({ error: "Professional not found" });
-    }
-
-    // Prevent re-updating if already accepted or rejected
-    if (professional.status === "accepted" || professional.status === "rejected") {
-      return res.status(400).json({ error: "Status already set and cannot be changed" });
-    }
-
-    // Proceed to update
-    professional.status = "accepted";
-    const updated = await professional.save();
-
-    res.json({ message: "Status updated to accepted", data: updated });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Reject a professional by ID
+// REJECT a professional by ID
 router.patch('/professionals/reject/:id', async (req, res) => {
   try {
     const professional = await Professional.findById(req.params.id);
@@ -44,12 +21,10 @@ router.patch('/professionals/reject/:id', async (req, res) => {
       return res.status(404).json({ error: "Professional not found" });
     }
 
-    // Prevent re-updating if already accepted or rejected
     if (professional.status === "accepted" || professional.status === "rejected") {
       return res.status(400).json({ error: "Status already set and cannot be changed" });
     }
 
-    // Proceed to update
     professional.status = "rejected";
     const updated = await professional.save();
 
@@ -59,6 +34,33 @@ router.patch('/professionals/reject/:id', async (req, res) => {
   }
 });
 
+// ACCEPT and MOVE a professional by ID
+router.put('/professionals/accept/:id', async (req, res) => {
+  try {
+    const professional = await Professional.findById(req.params.id);
+    if (!professional) {
+      return res.status(404).json({ error: 'Professional not found' });
+    }
+
+    if (professional.status === 'accepted' || professional.status === 'rejected') {
+      return res.status(400).json({ error: 'Status already set and cannot be changed' });
+    }
+
+    const acceptedData = {
+      ...professional.toObject(),
+      status: 'accepted'
+    };
+    delete acceptedData._id;
+
+    await AcceptedProfessional.create(acceptedData);
+    await Professional.findByIdAndDelete(req.params.id);
+
+    return res.status(200).json({ message: 'Professional moved to accepted collection' });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 module.exports = router;
 
